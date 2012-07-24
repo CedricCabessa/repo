@@ -21,7 +21,7 @@ import urlparse
 import xml.dom.minidom
 
 from git_config import GitConfig, IsId
-from project import RemoteSpec, Project, MetaProject, R_HEADS, HEAD
+from project import RemoteSpec, Project, SVNProject, MetaProject, R_HEADS, HEAD
 from error import ManifestParseError
 
 MANIFEST_FILE_NAME = 'manifest.xml'
@@ -236,6 +236,11 @@ class XmlManifest(object):
     return self._projects
 
   @property
+  def svnprojects(self):
+    self._Load()
+    return self._svnprojects
+
+  @property
   def remotes(self):
     self._Load()
     return self._remotes
@@ -267,6 +272,7 @@ class XmlManifest(object):
   def _Unload(self):
     self._loaded = False
     self._projects = {}
+    self._svnprojects = {}
     self._remotes = {}
     self._default = None
     self._repo_hooks_project = None
@@ -374,6 +380,14 @@ class XmlManifest(object):
               'duplicate project %s in %s' %
               (project.name, self.manifestFile))
         self._projects[project.name] = project
+      if node.nodeName == 'svnproject':
+        svnproject = self._ParseSVNProject(node)
+        if self._svnprojects.get(svnproject.name):
+          raise ManifestParseError(
+              'duplicate svn project %s in %s' %
+              (svnproject.name, self.manifestFile))
+        self._svnprojects[svnproject.name] = svnproject
+
       if node.nodeName == 'repo-hooks':
         # Get the name of the project and the (space-separated) list of enabled.
         repo_hooks_project = self._reqatt(node, 'in-project')
@@ -596,6 +610,51 @@ class XmlManifest(object):
         self._ParseAnnotation(project, n)
 
     return project
+
+  def _ParseSVNProject(self, node):
+    """
+    reads a <svnproject> element from the manifest file
+    """
+    name = self._reqatt(node, 'name')
+
+    remote = self._get_remote(node)
+    if remote is None:
+      remote = self._default.remote
+    if remote is None:
+      raise ManifestParseError, \
+            "no remote for project %s within %s" % \
+            (name, self.manifestFile)
+
+    revisionExpr = node.getAttribute('revision')
+    if not revisionExpr:
+      revisionExpr = self._default.revisionExpr
+    if not revisionExpr:
+      raise ManifestParseError, \
+            "no revision for project %s within %s" % \
+            (name, self.manifestFile)
+
+    path = node.getAttribute('path')
+    if not path:
+      path = name
+    if path.startswith('/'):
+      raise ManifestParseError, \
+            "project %s path cannot be absolute in %s" % \
+            (name, self.manifestFile)
+
+    if self.IsMirror:
+      relpath = None
+      worktree = None
+    else:
+      worktree = os.path.join(self.topdir, path).replace('\\', '/')
+
+    svnproject = SVNProject(manifest = self,
+                      name = name,
+                      remote = remote.ToRemoteSpec(name),
+                      worktree = worktree,
+                      relpath = path,
+                      revisionExpr = revisionExpr,
+                      revisionId = None)
+    return svnproject
 
   def _ParseCopyFile(self, project, node):
     src = self._reqatt(node, 'src')

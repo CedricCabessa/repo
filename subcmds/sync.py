@@ -475,6 +475,25 @@ uncommitted changes are present' % project.relpath
     if self.manifest.notice:
       print self.manifest.notice
 
+    if not opt.local_only:
+      self.svn()
+
+  def svn(self):
+    all = self.manifest.svnprojects
+    for svnp in all.values():
+      if svnp.Exists == False :
+        svnp.checkout()
+      else :
+        if svnp.isCorrectBranch() :
+          svnp.update()
+        else :
+           print >>sys.stderr, \
+               """Project "%s" is not on the correct branch, please save your changes and checkout %s.
+If you have no change, just trash the project and re-run repo sync.
+""" % \
+               (svnp.relpath, svnp.revision)
+           sys.exit(1)
+
 def _PostRepoUpgrade(manifest):
   for project in manifest.projects.values():
     if project.Exists:

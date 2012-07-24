@@ -37,6 +37,7 @@ except ImportError:
 from color import Coloring
 from git_command import GitCommand
 from git_config import GitConfig, IsId, GetSchemeFromUrl, ID_RE
+from svn_command import SvnCommand
 from error import DownloadError
 from error import GitError, HookError, ImportError, UploadError
 from error import ManifestInvalidRevisionError
@@ -2215,3 +2216,81 @@ class MetaProject(Project):
     elif self._revlist(not_rev(HEAD), revid):
       return True
     return False
+
+class SVNProject(object):
+  def __init__(self,
+               manifest,
+               name,
+               remote,
+               worktree,
+               relpath,
+               revisionExpr,
+               revisionId):
+    self.manifest = manifest
+    self.name = name
+    self.remote = remote
+    if worktree:
+      self.worktree = worktree.replace('\\', '/')
+    else:
+      self.worktree = None
+    self.relpath = relpath
+    self.revisionExpr = revisionExpr
+
+    if   revisionId is None \
+     and revisionExpr \
+     and IsId(revisionExpr):
+      self.revisionId = revisionExpr
+    else:
+      self.revisionId = revisionId
+
+  @property
+  def Exists(self):
+    return os.path.isdir("%s/.svn" % self.worktree)
+
+  @property
+  def IsDirty(self) :
+    """Is the working directory modified in some way?
+    """
+    p = SvnCommand(self, ['status', '-q'], capture_stdout=True)
+    ret = len(p.process.stdout.readlines()) > 0
+    p.Wait()
+    return ret
+
+  @property
+  def revision(self) :
+    return self.revisionExpr
+
+  def checkout(self) :
+    if os.path.isdir(self.worktree) == False:
+      os.mkdir(self.worktree)
+
+    print("svn checkout %s" % self._buildUrl())
+    p = SvnCommand(self, ['checkout', self._buildUrl(), '.' ])
+    p.Wait()
+
+  def isCorrectBranch(self) :
+    p = SvnCommand(self, ['info'], capture_stdout=True)
+    for line in p.process.stdout :
+      if(line.startswith('URL:')) :
+        currentUrl = line.split()[1]
+        break
+    if(currentUrl == self._buildUrl()):
+      return True
+    return False
+
+  def update(self) :
+    self.checkout()
+
+  def _buildUrl(self):
+    branch = 'trunk'
+    url = self.name
+    if self.revision != None :
+      branch = self.revision
+    if url.endswith('/') == False :
+      url += '/'
+    url += branch
+    return url
+
+
+  def __str__(self) :
+    return "name=%s path=%s rev=%s" % (self.name, self.worktree, self.revision )
