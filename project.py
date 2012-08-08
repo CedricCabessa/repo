@@ -2281,6 +2281,10 @@ class SVNProject(object):
   def update(self) :
     return self.checkout()
 
+  def switch(self) :
+     p = SvnCommand(self, ['switch', self._buildUrl(), '.' ])
+     return p.Wait()
+
   def _buildUrl(self):
     branch = 'trunk'
     url = self.name

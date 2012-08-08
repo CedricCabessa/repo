@@ -490,13 +490,11 @@ uncommitted changes are present' % project.relpath
           ret = svnp.update()
           if ret != 0 :
             __svn_error("update")
-          else :
-            print >>sys.stderr, \
-                """Project "%s" is not on the correct branch, please save your changes and checkout %s.
-If you have no change, just trash the project and re-run repo sync.
-""" % \
-                (svnp.relpath, svnp.revision)
-            sys.exit(1)
+        else :
+          ret = svnp.switch()
+          if ret != 0 :
+            __svn_error("switch")
+
 
 def __svn_error(svnfct) :
   print >>sys.stderr, \
