@@ -482,17 +482,27 @@ uncommitted changes are present' % project.relpath
     all = self.manifest.svnprojects
     for svnp in all.values():
       if svnp.Exists == False :
-        svnp.checkout()
+        ret = svnp.checkout()
+        if ret != 0 :
+          __svn_error("checkout")
       else :
         if svnp.isCorrectBranch() :
-          svnp.update()
-        else :
-           print >>sys.stderr, \
-               """Project "%s" is not on the correct branch, please save your changes and checkout %s.
+          ret = svnp.update()
+          if ret != 0 :
+            __svn_error("update")
+          else :
+            print >>sys.stderr, \
+                """Project "%s" is not on the correct branch, please save your changes and checkout %s.
 If you have no change, just trash the project and re-run repo sync.
 """ % \
-               (svnp.relpath, svnp.revision)
-           sys.exit(1)
+                (svnp.relpath, svnp.revision)
+            sys.exit(1)
+
+def __svn_error(svnfct) :
+  print >>sys.stderr, \
+      """Oops, something bad happened durring %s, abort""" % (svnfct)
+  sys.exit(1)
+
 
 def _PostRepoUpgrade(manifest):
   for project in manifest.projects.values():

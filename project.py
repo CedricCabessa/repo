@@ -2266,7 +2266,7 @@ class SVNProject(object):
 
     print("svn checkout %s" % self._buildUrl())
     p = SvnCommand(self, ['checkout', self._buildUrl(), '.' ])
-    p.Wait()
+    return p.Wait()
 
   def isCorrectBranch(self) :
     p = SvnCommand(self, ['info'], capture_stdout=True)
@@ -2279,7 +2279,7 @@ class SVNProject(object):
     return False
 
   def update(self) :
-    self.checkout()
+    return self.checkout()
 
   def _buildUrl(self):
     branch = 'trunk'
